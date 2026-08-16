@@ -24,7 +24,7 @@ class MotionManager: ObservableObject {
     @Published var isSpinning: Bool = false
     @Published var allTimeBest: Double = UserDefaults.standard.double(forKey: "allTimeBest")
     @Published var lastCompletedSession: SpinSessionModel? = nil
-    @Published var stillDelay: Double = 0.5
+    @Published var stillDelay: Double = 0.2
     @Published var currentFingerProbability: Double = 0.0
     @Published var isBlockedAfterReverse: Bool = false
     @Published var currentChaosScore: Double = 0.0

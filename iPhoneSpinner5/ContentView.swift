@@ -25,17 +25,17 @@ struct ContentView: View {
                 ZStack {
                     Circle()
                         .fill(
-                            motion.isSpinning ? .blue.opacity(0.15) :
-                            motion.isBlockedAfterReverse ? .gray.opacity(0.08) :
-                            .green.opacity(0.12)
+                            motion.isSpinning ? Color("AccentColor").opacity(0.16) :
+                            motion.isBlockedAfterReverse ? .gray.opacity(0.10) :
+                            Color("PBSurface")
                         )
                         .frame(width: 260, height: 260)
                         .animation(.easeInOut(duration: 0.3), value: motion.isSpinning)
 
                     VStack(spacing: 6) {
                         Text("\(motion.currentSpins, specifier: "%.2f")")
-                            .font(.system(size: 72, weight: .bold, design: .rounded))
-                            .foregroundStyle(motion.isSpinning ? .blue : .primary)
+                            .font(.system(size: 72, weight: .bold, design: .monospaced))
+                            .foregroundStyle(motion.isSpinning ? Color("AccentColor") : .primary)
                             .contentTransition(.numericText())
                             .animation(.default, value: motion.currentSpins)
 
@@ -50,8 +50,8 @@ struct ContentView: View {
                                 .transition(.opacity)
 
                             Text("\(Int(motion.currentRPM)) RPM")
-                                .font(.caption)
-                                .foregroundStyle(.blue.opacity(0.8))
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(Color("AccentColor").opacity(0.85))
                                 .transition(.opacity)
 
                             Text(fingerLabel(motion.currentFingerProbability))
@@ -89,11 +89,11 @@ struct ContentView: View {
                 if let best = bestSession {
                     HStack {
                         Label("Meilleur (session)", systemImage: "trophy.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color("PBAmber"))
                             .font(.subheadline)
                         Spacer()
                         Text("\(best.totalSpins, specifier: "%.2f") tours")
-                            .font(.subheadline)
+                            .font(.subheadline.monospacedDigit())
                             .fontWeight(.semibold)
                     }
                     .padding(.horizontal, 24)
@@ -102,11 +102,11 @@ struct ContentView: View {
 
                 HStack {
                     Label("Record absolu", systemImage: "star.fill")
-                        .foregroundStyle(.yellow)
+                        .foregroundStyle(Color("PBAmber"))
                         .font(.subheadline)
                     Spacer()
                     Text("\(motion.allTimeBest, specifier: "%.2f") tours")
-                        .font(.subheadline)
+                        .font(.subheadline.monospacedDigit())
                         .fontWeight(.semibold)
                 }
                 .padding(.horizontal, 24)
@@ -126,19 +126,19 @@ struct ContentView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Text("\(session.totalSpins, specifier: "%.2f") tours")
-                                    .font(.headline)
+                                    .font(.headline.monospacedDigit())
                                 Spacer()
                                 Text(SpinMode(rawValue: session.spinMode)?.label ?? "🌀 Spin")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                 Text("\(Int(session.maxRPM)) RPM max")
-                                    .font(.caption)
-                                    .foregroundStyle(.blue)
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(Color("PBAmber"))
                             }
 
                             GeometryReader { geo in
                                 RoundedRectangle(cornerRadius: 4)
-                                    .fill(.blue.opacity(0.7))
+                                    .fill(Color("PBAmber").opacity(0.7))
                                     .frame(width: geo.size.width * (session.totalSpins / maxSpins), height: 6)
                             }
                             .frame(height: 6)
@@ -175,12 +175,17 @@ struct ContentView: View {
                         }
                         .padding(.vertical, 4)
                         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                        .listRowBackground(fingerColor(session.fingerProbability).opacity(0.25))
+                        .listRowBackground(
+                            Color("PBSurface").overlay(fingerColor(session.fingerProbability).opacity(0.25))
+                        )
                     }
                     .environment(\.defaultMinListRowHeight, 0)
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
+            .background(Color("PBBackground").ignoresSafeArea())
+            .tint(Color("AccentColor"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -192,6 +197,7 @@ struct ContentView: View {
                         .padding(.horizontal)
                     } label: {
                         Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(Color("AccentColor"))
                     }
                 }
 
