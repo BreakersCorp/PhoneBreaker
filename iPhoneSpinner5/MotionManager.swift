@@ -55,7 +55,6 @@ class MotionManager: ObservableObject {
     private let minValidSpins: Double = 0.15
     private var spinDirection: Double = 0.0
     private var reverseBlockTimer: Timer?
-    private var previousZ: Double = 0.0
     // Timestamp CoreMotion (horloge monotone, en secondes) du dernier échantillon
     // intégré. Sert à calculer le vrai delta-t entre deux échantillons plutôt que
     // de supposer que gyroUpdateInterval (0.02s) s'est écoulé — le callback tourne
@@ -186,7 +185,6 @@ class MotionManager: ObservableObject {
                 self.rotationRateZSamples = []
                 self.rotationRateXYSamples = []
                 self.accelerometerSamples = []
-                self.previousZ = 0.0
                 self.lastGyroTimestamp = nil
 
                 let bufferedSamples = self.pendingSamples
@@ -264,7 +262,6 @@ class MotionManager: ObservableObject {
                     if let accelActivity = sample.accelActivity {
                         self.accelerometerSamples.append(accelActivity)
                     }
-                    self.previousZ = signedRate
                 }
 
                 self.currentFingerProbability = self.computeFingerProbability(
@@ -357,8 +354,6 @@ class MotionManager: ObservableObject {
                                        abs(accelData.acceleration.z - 1.0)
                     self.accelerometerSamples.append(accelActivity)
                 }
-
-                self.previousZ = signedRate
 
                 self.currentFingerProbability = self.computeFingerProbability(
                     zSamples: self.rotationRateZSamples,
@@ -483,7 +478,6 @@ class MotionManager: ObservableObject {
         sessionStart = nil
         stillTimer = nil
         spinDirection = 0.0
-        previousZ = 0.0
         lastGyroTimestamp = nil
         reverseBlockTimer?.invalidate()
         reverseBlockTimer = nil
