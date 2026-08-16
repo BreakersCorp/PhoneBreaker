@@ -24,7 +24,6 @@ class MotionManager: ObservableObject {
     @Published var isSpinning: Bool = false
     @Published var allTimeBest: Double = UserDefaults.standard.double(forKey: "allTimeBest")
     @Published var lastCompletedSession: SpinSessionModel? = nil
-    @Published var stillDelay: Double = 0.2
     @Published var currentFingerProbability: Double = 0.0
     @Published var isBlockedAfterReverse: Bool = false
     @Published var currentChaosScore: Double = 0.0
@@ -34,6 +33,8 @@ class MotionManager: ObservableObject {
     private var maxRPM: Double = 0.0
     private var sessionStart: Date?
     private var stillTimer: Timer?
+    // Délai (secondes) sous le seuil avant de considérer la session terminée.
+    private let stillDelay: Double = 0.2
     private let stillThresholdZ: Double = 30   // spin sur doigt — rapide
     private let stillThresholdX: Double = 15   // backflip — moins rapide
     private let stillThresholdY: Double = 15   // sideflip — moins rapide

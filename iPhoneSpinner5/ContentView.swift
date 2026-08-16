@@ -188,20 +188,6 @@ struct ContentView: View {
             .tint(Color("AccentColor"))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        VStack {
-                            Label("Délai : \(motion.stillDelay, specifier: "%.1f")s", systemImage: "timer")
-                                .font(.caption)
-                            Slider(value: $motion.stillDelay, in: 0.2...2.0, step: 0.1)
-                        }
-                        .padding(.horizontal)
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .foregroundStyle(Color("AccentColor"))
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
