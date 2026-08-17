@@ -1,0 +1,189 @@
+{
+  "sourceLanguage" : "fr",
+  "strings" : {
+    "%.2f" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.2f"
+          }
+        }
+      }
+    },
+    "%.2f tours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.2f turns"
+          }
+        }
+      }
+    },
+    "%@" : {
+
+    },
+    "%lld RPM" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld RPM"
+          }
+        }
+      }
+    },
+    "%lld RPM max" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld RPM max"
+          }
+        }
+      }
+    },
+    "↔️ Sideflip" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "↔️ Sideflip"
+          }
+        }
+      }
+    },
+    "⚠️ Incertain" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⚠️ Uncertain"
+          }
+        }
+      }
+    },
+    "✅ Vrai spin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Real spin"
+          }
+        }
+      }
+    },
+    "❌ Support" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Propped"
+          }
+        }
+      }
+    },
+    "🌀 Spin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🌀 Spin"
+          }
+        }
+      }
+    },
+    "🔄 Backflip" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🔄 Backflip"
+          }
+        }
+      }
+    },
+    "Annuler" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "Chaos" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chaos"
+          }
+        }
+      }
+    },
+    "Lance une session pour commencer !" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Start a session to begin!"
+          }
+        }
+      }
+    },
+    "Moyenne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Average"
+          }
+        }
+      }
+    },
+    "Record absolu" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All-time best"
+          }
+        }
+      }
+    },
+    "Réinitialiser" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset"
+          }
+        }
+      }
+    },
+    "Réinitialiser les scores ?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset scores?"
+          }
+        }
+      }
+    },
+    "tours" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "turns"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

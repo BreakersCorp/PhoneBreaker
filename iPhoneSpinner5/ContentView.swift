@@ -277,9 +277,9 @@ struct ContentView: View {
 
     private func fingerLabel(_ probability: Double) -> String {
         switch probability {
-        case 0.7...: return "✅ Vrai spin"
-        case 0.4..<0.7: return "⚠️ Incertain"
-        default: return "❌ Support"
+        case 0.7...: return String(localized: "✅ Vrai spin")
+        case 0.4..<0.7: return String(localized: "⚠️ Incertain")
+        default: return String(localized: "❌ Support")
         }
     }
 

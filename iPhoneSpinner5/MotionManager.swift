@@ -9,9 +9,9 @@ enum SpinMode: String, CaseIterable {
 
     var label: String {
         switch self {
-        case .spin: return "🌀 Spin"
-        case .backflip: return "🔄 Backflip"
-        case .sideflip: return "↔️ Sideflip"
+        case .spin: return String(localized: "🌀 Spin")
+        case .backflip: return String(localized: "🔄 Backflip")
+        case .sideflip: return String(localized: "↔️ Sideflip")
         }
     }
 
