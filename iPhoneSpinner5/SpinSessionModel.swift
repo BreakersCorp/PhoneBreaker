@@ -21,3 +21,14 @@ class SpinSessionModel {
         self.spinMode = spinMode
     }
 }
+
+extension SpinSessionModel {
+    /// Seuil de fingerProbability à partir duquel une rotation est
+    /// considérée comme "réelle" (✅ Vrai spin) et non un mouvement
+    /// effectué avec un support.
+    static let realSpinThreshold = 0.7
+
+    var isRealSpin: Bool {
+        fingerProbability >= Self.realSpinThreshold
+    }
+}

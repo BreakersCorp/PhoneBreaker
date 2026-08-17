@@ -7,10 +7,6 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showResetConfirmation = false
 
-    var bestSession: SpinSessionModel? {
-        sessions.max(by: { $0.totalSpins < $1.totalSpins })
-    }
-
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "dd/MM HH:mm"
@@ -85,29 +81,30 @@ struct ContentView: View {
                 .padding(.top, 40)
                 .padding(.bottom, 24)
 
-                // --- Scores ---
-                if let best = bestSession {
-                    HStack {
-                        Label("Meilleur (session)", systemImage: "trophy.fill")
-                            .foregroundStyle(Color("PBAmber"))
-                            .font(.subheadline)
-                        Spacer()
-                        Text("\(best.totalSpins, specifier: "%.2f") tours")
-                            .font(.subheadline.monospacedDigit())
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 8)
-                }
-
-                HStack {
+                // --- Scores (séparés par type de rotation) ---
+                VStack(alignment: .leading, spacing: 4) {
                     Label("Record absolu", systemImage: "star.fill")
                         .foregroundStyle(Color("PBAmber"))
                         .font(.subheadline)
-                    Spacer()
-                    Text("\(motion.allTimeBest, specifier: "%.2f") tours")
-                        .font(.subheadline.monospacedDigit())
-                        .fontWeight(.semibold)
+                    modeScoresRow { mode in
+                        // Max entre le record persisté (UserDefaults) et le
+                        // meilleur des sessions réelles stockées : les sessions
+                        // antérieures à la séparation des records par mode
+                        // n'ont jamais écrit leur record par mode.
+                        let stored = motion.allTimeBests[mode] ?? 0.0
+                        let fromSessions = bestRealSessionSpins(for: mode) ?? 0.0
+                        let best = max(stored, fromSessions)
+                        return best > 0 ? best : nil
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.bottom, 8)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Moyenne", systemImage: "chart.bar.fill")
+                        .foregroundStyle(Color("PBAmber"))
+                        .font(.subheadline)
+                    modeScoresRow { averageRealSpins(for: $0) }
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
@@ -217,12 +214,59 @@ struct ContentView: View {
         }
     }
 
+    // Une ligne de scores par mode : "🌀 12.34   🔄 4.56   ↔️ –",
+    // le tiret signalant qu'aucun score n'existe encore pour ce mode.
+    private func modeScoresRow(value: @escaping (SpinMode) -> Double?) -> some View {
+        HStack {
+            ForEach(SpinMode.allCases, id: \.self) { mode in
+                HStack(spacing: 4) {
+                    Text(mode.emoji)
+                        .font(.caption)
+                    Text(spinsString(value(mode)))
+                        .font(.subheadline.monospacedDigit())
+                        .fontWeight(.semibold)
+                }
+                if mode != SpinMode.allCases.last {
+                    Spacer()
+                }
+            }
+        }
+    }
+
+    // Meilleur score des sessions "réelles" (vrai spin) stockées pour un mode
+    // donné, nil s'il n'y en a aucune.
+    private func bestRealSessionSpins(for mode: SpinMode) -> Double? {
+        sessions.lazy
+            .filter { $0.spinMode == mode.rawValue && $0.isRealSpin }
+            .map(\.totalSpins)
+            .max()
+    }
+
+    // Moyenne des tours des sessions "réelles" (vrai spin) pour un mode donné,
+    // nil s'il n'y en a aucune.
+    private func averageRealSpins(for mode: SpinMode) -> Double? {
+        let realSpins = sessions
+            .filter { $0.spinMode == mode.rawValue && $0.isRealSpin }
+            .map(\.totalSpins)
+        guard !realSpins.isEmpty else { return nil }
+        return realSpins.reduce(0, +) / Double(realSpins.count)
+    }
+
+    private func spinsString(_ spins: Double?) -> String {
+        guard let spins else { return "–" }
+        return String(format: "%.2f", spins)
+    }
+
     private func resetScores() {
         for session in sessions {
             modelContext.delete(session)
         }
-        motion.allTimeBest = 0.0
-        UserDefaults.standard.set(0.0, forKey: "allTimeBest")
+        for mode in SpinMode.allCases {
+            motion.allTimeBests[mode] = 0.0
+            UserDefaults.standard.set(0.0, forKey: "allTimeBest_\(mode.rawValue)")
+        }
+        // Ancienne clé du record global (avant la séparation par mode).
+        UserDefaults.standard.removeObject(forKey: "allTimeBest")
     }
 
     private func durationString(_ duration: TimeInterval) -> String {

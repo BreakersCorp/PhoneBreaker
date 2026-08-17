@@ -2,7 +2,7 @@ import CoreMotion
 import Combine
 import Foundation
 
-enum SpinMode: String {
+enum SpinMode: String, CaseIterable {
     case spin = "spin"
     case backflip = "backflip"
     case sideflip = "sideflip"
@@ -14,6 +14,14 @@ enum SpinMode: String {
         case .sideflip: return "↔️ Sideflip"
         }
     }
+
+    var emoji: String {
+        switch self {
+        case .spin: return "🌀"
+        case .backflip: return "🔄"
+        case .sideflip: return "↔️"
+        }
+    }
 }
 
 class MotionManager: ObservableObject {
@@ -22,7 +30,9 @@ class MotionManager: ObservableObject {
     @Published var currentSpins: Double = 0.0
     @Published var currentRPM: Double = 0.0
     @Published var isSpinning: Bool = false
-    @Published var allTimeBest: Double = UserDefaults.standard.double(forKey: "allTimeBest")
+    // Records absolus séparés par type de rotation, persistés dans
+    // UserDefaults sous les clés "allTimeBest_<mode>".
+    @Published var allTimeBests: [SpinMode: Double] = MotionManager.loadAllTimeBests()
     @Published var lastCompletedSession: SpinSessionModel? = nil
     @Published var currentFingerProbability: Double = 0.0
     @Published var isBlockedAfterReverse: Bool = false
@@ -81,6 +91,22 @@ class MotionManager: ObservableObject {
     private var accelerometerSamples: [Double] = []
 
     private var detectedMode: SpinMode = .spin
+
+    private static func loadAllTimeBests() -> [SpinMode: Double] {
+        var bests: [SpinMode: Double] = [:]
+        for mode in SpinMode.allCases {
+            bests[mode] = UserDefaults.standard.double(forKey: "allTimeBest_\(mode.rawValue)")
+        }
+        // Migration de l'ancien record global (avant la séparation par mode) :
+        // on ne connaît pas le mode d'origine, on l'attribue au spin, le mode
+        // historique par défaut.
+        let legacy = UserDefaults.standard.double(forKey: "allTimeBest")
+        if legacy > (bests[.spin] ?? 0.0) {
+            bests[.spin] = legacy
+            UserDefaults.standard.set(legacy, forKey: "allTimeBest_\(SpinMode.spin.rawValue)")
+        }
+        return bests
+    }
 
     func startTracking() {
         guard motion.isGyroAvailable else { return }
@@ -460,9 +486,11 @@ class MotionManager: ObservableObject {
                 spinMode: detectedMode.rawValue
             )
 
-            if session.totalSpins > allTimeBest {
-                allTimeBest = session.totalSpins
-                UserDefaults.standard.set(allTimeBest, forKey: "allTimeBest")
+            // Seules les rotations "réelles" (vrai spin, pas un mouvement
+            // avec support) comptent pour les records.
+            if session.isRealSpin, session.totalSpins > (allTimeBests[detectedMode] ?? 0.0) {
+                allTimeBests[detectedMode] = session.totalSpins
+                UserDefaults.standard.set(session.totalSpins, forKey: "allTimeBest_\(detectedMode.rawValue)")
             }
 
             lastCompletedSession = session
