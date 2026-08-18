@@ -6,6 +6,7 @@ struct ContentView: View {
     @StateObject private var gameCenter = GameCenterManager()
     @Query(sort: \SpinSessionModel.date, order: .reverse) var sessions: [SpinSessionModel]
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showResetConfirmation = false
 
     var body: some View {
@@ -247,6 +248,22 @@ struct ContentView: View {
                 motion.startTracking()
                 gameCenter.authenticate()
             }
+            // En arrière-plan, le gyroscope et l'accéléromètre continueraient
+            // de tourner et de vider la batterie : on coupe le suivi (ce qui
+            // termine proprement une éventuelle session en cours) et on le
+            // relance au retour au premier plan. .inactive est ignoré : c'est
+            // un état transitoire (centre de notifications, appel entrant) qui
+            // ne doit pas interrompre un spin.
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .active:
+                    motion.startTracking()
+                case .background:
+                    motion.stopTracking()
+                default:
+                    break
+                }
+            }
             .onChange(of: motion.lastCompletedSession) { _, session in
                 if let session = session {
                     modelContext.insert(session)
@@ -350,12 +367,10 @@ struct ContentView: View {
         for session in sessions {
             modelContext.delete(session)
         }
-        for mode in SpinMode.allCases {
-            motion.allTimeBests[mode] = 0.0
-            UserDefaults.standard.set(0.0, forKey: "allTimeBest_\(mode.rawValue)")
-        }
-        // Ancienne clé du record global (avant la séparation par mode).
-        UserDefaults.standard.removeObject(forKey: "allTimeBest")
+        // Les records (et leur persistance UserDefaults) appartiennent au
+        // MotionManager : les écraser directement ici désynchroniserait sa
+        // copie interne, côté file de traitement.
+        motion.resetBests()
     }
 
     private func durationString(_ duration: TimeInterval) -> String {

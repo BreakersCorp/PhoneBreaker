@@ -31,11 +31,17 @@ enum SpinMode: String, CaseIterable {
 class MotionManager: ObservableObject {
     private let motion = CMMotionManager()
 
+    // --- État publié, réservé à l'affichage. Écrit uniquement depuis le main
+    // thread, via des instantanés envoyés par la file de traitement (voir
+    // publishLive et endSession). Pendant une session la publication est
+    // throttlée à uiPublishInterval : publier à la cadence brute du gyroscope
+    // (50 Hz) forcerait SwiftUI à recalculer la vue à chaque échantillon.
     @Published var currentSpins: Double = 0.0
     @Published var currentRPM: Double = 0.0
     @Published var isSpinning: Bool = false
     // Records absolus séparés par type de rotation, persistés dans
-    // UserDefaults sous les clés "allTimeBest_<mode>".
+    // UserDefaults sous les clés "allTimeBest_<mode>". Miroir d'affichage
+    // de `bests`, qui reste la référence côté traitement.
     @Published var allTimeBests: [SpinMode: Double] = MotionManager.loadAllTimeBests()
     @Published var lastCompletedSession: SpinSessionModel? = nil
     @Published var currentFingerProbability: Double = 0.0
@@ -43,10 +49,36 @@ class MotionManager: ObservableObject {
     @Published var currentChaosScore: Double = 0.0
     @Published var currentMode: SpinMode = .spin  // ← mode détecté en temps réel
 
+    // --- File de traitement des échantillons. Tout l'état privé ci-dessous
+    // lui appartient et ne doit être lu/écrit que depuis cette file : les
+    // callbacks CoreMotion y arrivent via motionOperationQueue, et les appels
+    // externes (stopTracking, resetBests) y sautent explicitement.
+    private let processingQueue = DispatchQueue(label: "MotionManager.processing")
+    private lazy var motionOperationQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        queue.underlyingQueue = processingQueue
+        return queue
+    }()
+
+    // Cadence maximum de publication vers l'UI pendant une session.
+    private let uiPublishInterval: TimeInterval = 1.0 / 15.0
+    private var lastPublishTimestamp: TimeInterval = 0.0
+
+    // Équivalents internes des @Published, côté traitement.
+    private var sessionActive = false
+    private var blockedAfterReverse = false
+    private var bests: [SpinMode: Double] = MotionManager.loadAllTimeBests()
+    private var liveFingerProbability: Double = 0.0
+    private var liveChaosScore: Double = 0.0
+
     private var totalRadians: Double = 0.0
     private var maxRPM: Double = 0.0
     private var sessionStart: Date?
-    private var stillTimer: Timer?
+    // Fins de session/déblocage différés : la file de traitement n'a pas de
+    // run loop, donc pas de Timer — on utilise des DispatchWorkItem
+    // annulables planifiés sur processingQueue.
+    private var stillWorkItem: DispatchWorkItem?
     // Délai (secondes) sous le seuil avant de considérer la session terminée.
     private let stillDelay: Double = 0.2
     private let stillThresholdZ: Double = 30   // spin sur doigt — rapide
@@ -69,12 +101,11 @@ class MotionManager: ObservableObject {
     // recours, sur le total final.
     private let minValidSpins: Double = 0.15
     private var spinDirection: Double = 0.0
-    private var reverseBlockTimer: Timer?
+    private var reverseBlockWorkItem: DispatchWorkItem?
     // Timestamp CoreMotion (horloge monotone, en secondes) du dernier échantillon
     // intégré. Sert à calculer le vrai delta-t entre deux échantillons plutôt que
-    // de supposer que gyroUpdateInterval (0.02s) s'est écoulé — le callback tourne
-    // sur le main thread, qui est aussi occupé à rafraîchir la UI SwiftUI, donc la
-    // cadence réelle peut dériver de la cadence demandée.
+    // de supposer que gyroUpdateInterval (0.02s) s'est écoulé — la cadence réelle
+    // de livraison peut dériver de la cadence demandée.
     private var lastGyroTimestamp: TimeInterval?
 
     // Échantillons bruts accumulés pendant la fenêtre anti-rebond (voir
@@ -121,277 +152,317 @@ class MotionManager: ObservableObject {
             motion.startAccelerometerUpdates()
         }
 
-        motion.startGyroUpdates(to: .main) { [weak self] data, error in
+        // Les échantillons sont traités hors du main thread : le main est
+        // déjà occupé à rafraîchir la UI SwiftUI, et n'a de toute façon
+        // besoin que d'instantanés throttlés (voir publishLive).
+        motion.startGyroUpdates(to: motionOperationQueue) { [weak self] data, error in
             guard let self = self, let data = data else { return }
+            self.process(data)
+        }
+    }
 
-            if self.isBlockedAfterReverse { return }
+    // Traitement d'un échantillon gyroscope. Tourne sur processingQueue.
+    private func process(_ data: CMGyroData) {
+        if blockedAfterReverse { return }
 
-            // Sélectionne le bon axe selon le mode détecté
-            let primaryRate: Double
-            switch self.detectedMode {
-            case .spin:
-                primaryRate = abs(data.rotationRate.z)
-            case .backflip:
-                primaryRate = abs(data.rotationRate.x)
-            case .sideflip:
-                primaryRate = abs(data.rotationRate.y)
-            }
+        // Sélectionne le bon axe selon le mode détecté
+        let primaryRate: Double
+        switch detectedMode {
+        case .spin:
+            primaryRate = abs(data.rotationRate.z)
+        case .backflip:
+            primaryRate = abs(data.rotationRate.x)
+        case .sideflip:
+            primaryRate = abs(data.rotationRate.y)
+        }
 
-            let conv = 60 / (2 * Double.pi)
-            let rpm = primaryRate * conv
-            self.currentRPM = rpm
+        let conv = 60 / (2 * Double.pi)
+        let rpm = primaryRate * conv
 
-            let threshold: Double
-            switch self.detectedMode {
-            case .spin: threshold = self.stillThresholdZ
-            case .backflip: threshold = self.stillThresholdX
-            case .sideflip: threshold = self.stillThresholdY
-            }
+        let threshold: Double
+        switch detectedMode {
+        case .spin: threshold = stillThresholdZ
+        case .backflip: threshold = stillThresholdX
+        case .sideflip: threshold = stillThresholdY
+        }
 
-            // Pour démarrer une session, on regarde les 3 axes (pas seulement
-            // celui du mode par défaut) — sinon un backflip/sideflip pur ne
-            // dépasse jamais le seuil Z et la session ne démarre jamais.
-            let rpmX = abs(data.rotationRate.x) * conv
-            let rpmY = abs(data.rotationRate.y) * conv
-            let rpmZ = abs(data.rotationRate.z) * conv
-            let startThresholdMet = rpmZ > self.stillThresholdZ
-                || rpmX > self.stillThresholdX
-                || rpmY > self.stillThresholdY
+        // Pour démarrer une session, on regarde les 3 axes (pas seulement
+        // celui du mode par défaut) — sinon un backflip/sideflip pur ne
+        // dépasse jamais le seuil Z et la session ne démarre jamais.
+        let rpmX = abs(data.rotationRate.x) * conv
+        let rpmY = abs(data.rotationRate.y) * conv
+        let rpmZ = abs(data.rotationRate.z) * conv
+        let startThresholdMet = rpmZ > stillThresholdZ
+            || rpmX > stillThresholdX
+            || rpmY > stillThresholdY
 
-            if !self.isSpinning {
-                // Anti-rebond « leaky bucket » : chaque échantillon au-dessus
-                // du seuil fait avancer le compteur, chaque échantillon en
-                // dessous le fait seulement reculer d'un cran (pas de reset
-                // brutal à 0). Un vrai spin a presque toujours un ou deux
-                // échantillons de bruit/creux au démarrage (accélération
-                // progressive, gyroscope pas parfaitement lisse) ; avec un
-                // reset strict, ce creux annulait toute la progression et
-                // empêchait la session de démarrer — c'était le bug. Un
-                // geste parasite isolé (1-2 échantillons puis plus rien),
-                // lui, redescend à 0 avant d'avoir pu atteindre le seuil.
-                // Tant qu'il reste de la progression, on bufferise
-                // l'échantillon pour pouvoir rejouer toute la fenêtre si le
-                // démarrage se confirme.
-                if startThresholdMet {
-                    self.startCandidateSamples = min(self.startCandidateSamples + 1, self.requiredStartSamples)
-                    let accelActivity: Double?
-                    if let accelData = self.motion.accelerometerData {
-                        accelActivity = abs(accelData.acceleration.x)
-                            + abs(accelData.acceleration.y)
-                            + abs(accelData.acceleration.z - 1.0)
-                    } else {
-                        accelActivity = nil
-                    }
-                    self.pendingSamples.append(PendingSample(
-                        timestamp: data.timestamp,
-                        x: data.rotationRate.x,
-                        y: data.rotationRate.y,
-                        z: data.rotationRate.z,
-                        accelActivity: accelActivity
-                    ))
+        if !sessionActive {
+            // Anti-rebond « leaky bucket » : chaque échantillon au-dessus
+            // du seuil fait avancer le compteur, chaque échantillon en
+            // dessous le fait seulement reculer d'un cran (pas de reset
+            // brutal à 0). Un vrai spin a presque toujours un ou deux
+            // échantillons de bruit/creux au démarrage (accélération
+            // progressive, gyroscope pas parfaitement lisse) ; avec un
+            // reset strict, ce creux annulait toute la progression et
+            // empêchait la session de démarrer — c'était le bug. Un
+            // geste parasite isolé (1-2 échantillons puis plus rien),
+            // lui, redescend à 0 avant d'avoir pu atteindre le seuil.
+            // Tant qu'il reste de la progression, on bufferise
+            // l'échantillon pour pouvoir rejouer toute la fenêtre si le
+            // démarrage se confirme.
+            if startThresholdMet {
+                startCandidateSamples = min(startCandidateSamples + 1, requiredStartSamples)
+                let accelActivity: Double?
+                if let accelData = motion.accelerometerData {
+                    accelActivity = abs(accelData.acceleration.x)
+                        + abs(accelData.acceleration.y)
+                        + abs(accelData.acceleration.z - 1.0)
                 } else {
-                    self.startCandidateSamples = max(self.startCandidateSamples - 1, 0)
-                    if self.startCandidateSamples == 0 {
-                        self.pendingSamples.removeAll()
-                    } else if !self.pendingSamples.isEmpty {
-                        self.pendingSamples.removeFirst()
-                    }
+                    accelActivity = nil
                 }
-                guard self.startCandidateSamples >= self.requiredStartSamples else { return }
-                self.startCandidateSamples = 0
-
-                self.stillTimer?.invalidate()
-                self.stillTimer = nil
-
-                self.isSpinning = true
-                self.totalRadians = 0.0
-                self.maxRPM = 0.0
-                self.sessionStart = Date()
-                self.rotationRateZSamples = []
-                self.rotationRateXYSamples = []
-                self.accelerometerSamples = []
-                self.lastGyroTimestamp = nil
-
-                let bufferedSamples = self.pendingSamples
-                self.pendingSamples = []
-
-                // Mode ET sens de rotation sont déterminés tout de suite à
-                // partir de TOUTE la fenêtre anti-rebond (moyenne/somme sur
-                // ~6+ échantillons), pas sur un seul échantillon instantané
-                // ni via une fenêtre de détection séparée après coup. Un
-                // échantillon isolé peut être bruité (le gyroscope n'est pas
-                // parfaitement lisse) et donner un axe/signe qui ne reflète
-                // pas le mouvement réel. Décider après coup posait un
-                // problème encore plus grave pour backflip/sideflip : en
-                // attendant, le code supposait Z (spin) par défaut, donc le
-                // RPM lu (sur Z, quasi nul pour un vrai backflip/sideflip)
-                // retombait aussitôt sous le seuil et coupait la session
-                // avant même que le mode soit confirmé.
-                let avgAbsX = bufferedSamples.map { abs($0.x) }.reduce(0, +) / Double(bufferedSamples.count)
-                let avgAbsY = bufferedSamples.map { abs($0.y) }.reduce(0, +) / Double(bufferedSamples.count)
-                let avgAbsZ = bufferedSamples.map { abs($0.z) }.reduce(0, +) / Double(bufferedSamples.count)
-                if avgAbsZ >= avgAbsX && avgAbsZ >= avgAbsY {
-                    self.detectedMode = .spin
-                } else if avgAbsX >= avgAbsY {
-                    self.detectedMode = .backflip
-                } else {
-                    self.detectedMode = .sideflip
-                }
-                self.currentMode = self.detectedMode
-
-                let axisValues: [Double]
-                switch self.detectedMode {
-                case .spin: axisValues = bufferedSamples.map { $0.z }
-                case .backflip: axisValues = bufferedSamples.map { $0.x }
-                case .sideflip: axisValues = bufferedSamples.map { $0.y }
-                }
-                // Somme pondérée par récence plutôt qu'à poids égal : un
-                // backflip/sideflip est souvent un lancer en l'air (rotation
-                // libre sur plusieurs axes à la fois, contrairement au spin
-                // sur doigt qui est mécaniquement contraint à un seul axe),
-                // donc le tout début du buffer peut encore refléter le
-                // dernier contact de la main plutôt que la rotation une fois
-                // stabilisée. Les échantillons les plus récents (les plus
-                // proches de ce qui va suivre en direct) comptent plus.
-                var weightedSum = 0.0
-                for (index, value) in axisValues.enumerated() {
-                    weightedSum += value * Double(index + 1)
-                }
-                self.spinDirection = weightedSum > 0 ? 1.0 : -1.0
-
-                // Rejoue les échantillons accumulés pendant la fenêtre
-                // anti-rebond (celui-ci inclus) avec l'axe/sens qu'on vient
-                // de verrouiller, pour compter ces ~120ms de rotation au lieu
-                // de les jeter. Un échantillon dont le signe ne correspond
-                // pas au sens verrouillé (bruit en tout début de geste) est
-                // simplement ignoré, pas traité comme un "reverse".
-                for sample in bufferedSamples {
-                    let rate: Double
-                    switch self.detectedMode {
-                    case .spin: rate = sample.z
-                    case .backflip: rate = sample.x
-                    case .sideflip: rate = sample.y
-                    }
-                    let signedRate = rate * self.spinDirection
-                    guard signedRate > 0 else { continue }
-
-                    let dt = self.lastGyroTimestamp.map { sample.timestamp - $0 } ?? self.motion.gyroUpdateInterval
-                    self.lastGyroTimestamp = sample.timestamp
-
-                    self.totalRadians += signedRate * dt
-                    self.currentSpins = self.totalRadians / (2 * .pi)
-                    self.maxRPM = max(self.maxRPM, abs(rate) * conv)
-
-                    self.rotationRateZSamples.append(signedRate)
-                    self.rotationRateXYSamples.append(abs(sample.x) + abs(sample.y))
-                    if let accelActivity = sample.accelActivity {
-                        self.accelerometerSamples.append(accelActivity)
-                    }
-                }
-
-                self.currentFingerProbability = self.computeFingerProbability(
-                    zSamples: self.rotationRateZSamples,
-                    xySamples: self.rotationRateXYSamples,
-                    accelSamples: self.accelerometerSamples
-                )
-                self.currentChaosScore = self.computeChaosScore(
-                    zSamples: self.rotationRateZSamples,
-                    xySamples: self.rotationRateXYSamples,
-                    accelSamples: self.accelerometerSamples
-                )
-
-                // Le rejeu ci-dessus a déjà traité l'échantillon courant
-                // (dernier élément du buffer) : on s'arrête là pour ne pas le
-                // compter une deuxième fois via le traitement normal
-                // plus bas.
-                return
-            } else if rpm <= threshold {
-                // Session en cours mais retombée sous le seuil : on laisse le
-                // stillTimer existant suivre son cours, ou on en démarre un.
-                if self.stillTimer == nil {
-                    self.stillTimer = Timer.scheduledTimer(
-                        withTimeInterval: self.stillDelay,
-                        repeats: false
-                    ) { [weak self] _ in
-                        self?.endSession(reason: "stillTimer")
-                    }
-                }
-                return
+                pendingSamples.append(PendingSample(
+                    timestamp: data.timestamp,
+                    x: data.rotationRate.x,
+                    y: data.rotationRate.y,
+                    z: data.rotationRate.z,
+                    accelActivity: accelActivity
+                ))
             } else {
-                self.stillTimer?.invalidate()
-                self.stillTimer = nil
+                startCandidateSamples = max(startCandidateSamples - 1, 0)
+                if startCandidateSamples == 0 {
+                    pendingSamples.removeAll()
+                } else if !pendingSamples.isEmpty {
+                    pendingSamples.removeFirst()
+                }
+            }
+            guard startCandidateSamples >= requiredStartSamples else { return }
+            startCandidateSamples = 0
+
+            stillWorkItem?.cancel()
+            stillWorkItem = nil
+
+            sessionActive = true
+            totalRadians = 0.0
+            maxRPM = 0.0
+            sessionStart = Date()
+            rotationRateZSamples = []
+            rotationRateXYSamples = []
+            accelerometerSamples = []
+            lastGyroTimestamp = nil
+
+            let bufferedSamples = pendingSamples
+            pendingSamples = []
+
+            // Mode ET sens de rotation sont déterminés tout de suite à
+            // partir de TOUTE la fenêtre anti-rebond (moyenne/somme sur
+            // ~6+ échantillons), pas sur un seul échantillon instantané
+            // ni via une fenêtre de détection séparée après coup. Un
+            // échantillon isolé peut être bruité (le gyroscope n'est pas
+            // parfaitement lisse) et donner un axe/signe qui ne reflète
+            // pas le mouvement réel. Décider après coup posait un
+            // problème encore plus grave pour backflip/sideflip : en
+            // attendant, le code supposait Z (spin) par défaut, donc le
+            // RPM lu (sur Z, quasi nul pour un vrai backflip/sideflip)
+            // retombait aussitôt sous le seuil et coupait la session
+            // avant même que le mode soit confirmé.
+            let avgAbsX = bufferedSamples.map { abs($0.x) }.reduce(0, +) / Double(bufferedSamples.count)
+            let avgAbsY = bufferedSamples.map { abs($0.y) }.reduce(0, +) / Double(bufferedSamples.count)
+            let avgAbsZ = bufferedSamples.map { abs($0.z) }.reduce(0, +) / Double(bufferedSamples.count)
+            if avgAbsZ >= avgAbsX && avgAbsZ >= avgAbsY {
+                detectedMode = .spin
+            } else if avgAbsX >= avgAbsY {
+                detectedMode = .backflip
+            } else {
+                detectedMode = .sideflip
             }
 
-            // À partir d'ici self.isSpinning == true : soit on vient de
-            // démarrer (anti-rebond passé), soit la session continue.
-            do {
-                // Vérifie le sens de rotation sur le bon axe
-                let signedRate: Double
-                switch self.detectedMode {
-                case .spin:
-                    signedRate = data.rotationRate.z * self.spinDirection
-                case .backflip:
-                    signedRate = data.rotationRate.x * self.spinDirection
-                case .sideflip:
-                    signedRate = data.rotationRate.y * self.spinDirection
-                }
-
-                if signedRate < -0.5 {
-                    self.endSession(reason: "reverse")
-                    self.isBlockedAfterReverse = true
-                    self.reverseBlockTimer?.invalidate()
-                    self.reverseBlockTimer = Timer.scheduledTimer(
-                        withTimeInterval: self.stillDelay,
-                        repeats: false
-                    ) { [weak self] _ in
-                        self?.isBlockedAfterReverse = false
-                        self?.reverseBlockTimer = nil
-                    }
-                    return
-                }
-
-                guard signedRate > 0 else { return }
-
-                // Delta-t réel écoulé depuis le dernier échantillon intégré,
-                // basé sur l'horloge CoreMotion (data.timestamp) plutôt que sur
-                // gyroUpdateInterval : le callback tourne sur le main thread, qui
-                // est aussi sollicité par les rafraîchissements SwiftUI, donc la
-                // cadence réelle peut s'écarter de la cadence demandée (0.02s) et
-                // cette erreur s'accumulerait sur toute la session si on l'ignorait.
-                // Au premier échantillon de la session (pas de référence encore),
-                // on retombe sur l'intervalle nominal pour ne pas perdre cet
-                // échantillon.
-                let dt = self.lastGyroTimestamp.map { data.timestamp - $0 } ?? self.motion.gyroUpdateInterval
-                self.lastGyroTimestamp = data.timestamp
-
-                self.totalRadians += signedRate * dt
-                self.currentSpins = self.totalRadians / (2 * .pi)
-                self.maxRPM = max(self.maxRPM, rpm)
-
-                self.rotationRateZSamples.append(signedRate)
-
-                let xyActivity = abs(data.rotationRate.x) + abs(data.rotationRate.y)
-                self.rotationRateXYSamples.append(xyActivity)
-
-                if let accelData = self.motion.accelerometerData {
-                    let accelActivity = abs(accelData.acceleration.x) +
-                                       abs(accelData.acceleration.y) +
-                                       abs(accelData.acceleration.z - 1.0)
-                    self.accelerometerSamples.append(accelActivity)
-                }
-
-                self.currentFingerProbability = self.computeFingerProbability(
-                    zSamples: self.rotationRateZSamples,
-                    xySamples: self.rotationRateXYSamples,
-                    accelSamples: self.accelerometerSamples
-                )
-
-                self.currentChaosScore = self.computeChaosScore(
-                    zSamples: self.rotationRateZSamples,
-                    xySamples: self.rotationRateXYSamples,
-                    accelSamples: self.accelerometerSamples
-                )
+            let axisValues: [Double]
+            switch detectedMode {
+            case .spin: axisValues = bufferedSamples.map { $0.z }
+            case .backflip: axisValues = bufferedSamples.map { $0.x }
+            case .sideflip: axisValues = bufferedSamples.map { $0.y }
             }
+            // Somme pondérée par récence plutôt qu'à poids égal : un
+            // backflip/sideflip est souvent un lancer en l'air (rotation
+            // libre sur plusieurs axes à la fois, contrairement au spin
+            // sur doigt qui est mécaniquement contraint à un seul axe),
+            // donc le tout début du buffer peut encore refléter le
+            // dernier contact de la main plutôt que la rotation une fois
+            // stabilisée. Les échantillons les plus récents (les plus
+            // proches de ce qui va suivre en direct) comptent plus.
+            var weightedSum = 0.0
+            for (index, value) in axisValues.enumerated() {
+                weightedSum += value * Double(index + 1)
+            }
+            spinDirection = weightedSum > 0 ? 1.0 : -1.0
+
+            // Rejoue les échantillons accumulés pendant la fenêtre
+            // anti-rebond (celui-ci inclus) avec l'axe/sens qu'on vient
+            // de verrouiller, pour compter ces ~120ms de rotation au lieu
+            // de les jeter. Un échantillon dont le signe ne correspond
+            // pas au sens verrouillé (bruit en tout début de geste) est
+            // simplement ignoré, pas traité comme un "reverse".
+            for sample in bufferedSamples {
+                let rate: Double
+                switch detectedMode {
+                case .spin: rate = sample.z
+                case .backflip: rate = sample.x
+                case .sideflip: rate = sample.y
+                }
+                let signedRate = rate * spinDirection
+                guard signedRate > 0 else { continue }
+
+                let dt = lastGyroTimestamp.map { sample.timestamp - $0 } ?? motion.gyroUpdateInterval
+                lastGyroTimestamp = sample.timestamp
+
+                totalRadians += signedRate * dt
+                maxRPM = max(maxRPM, abs(rate) * conv)
+
+                rotationRateZSamples.append(signedRate)
+                rotationRateXYSamples.append(abs(sample.x) + abs(sample.y))
+                if let accelActivity = sample.accelActivity {
+                    accelerometerSamples.append(accelActivity)
+                }
+            }
+
+            liveFingerProbability = computeFingerProbability(
+                zSamples: rotationRateZSamples,
+                xySamples: rotationRateXYSamples,
+                accelSamples: accelerometerSamples
+            )
+            liveChaosScore = computeChaosScore(
+                zSamples: rotationRateZSamples,
+                xySamples: rotationRateXYSamples,
+                accelSamples: accelerometerSamples
+            )
+
+            // Le RPM affiché est recalculé sur l'axe qu'on vient de
+            // verrouiller — celui du haut de la fonction supposait encore
+            // le mode de la session précédente.
+            let liveRPM: Double
+            switch detectedMode {
+            case .spin: liveRPM = rpmZ
+            case .backflip: liveRPM = rpmX
+            case .sideflip: liveRPM = rpmY
+            }
+            publishLive(timestamp: data.timestamp, rpm: liveRPM, force: true)
+
+            // Le rejeu ci-dessus a déjà traité l'échantillon courant
+            // (dernier élément du buffer) : on s'arrête là pour ne pas le
+            // compter une deuxième fois via le traitement normal
+            // plus bas.
+            return
+        } else if rpm <= threshold {
+            // Session en cours mais retombée sous le seuil : on laisse le
+            // travail de fin de session existant suivre son cours, ou on en
+            // planifie un.
+            if stillWorkItem == nil {
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+                    self.stillWorkItem = nil
+                    self.endSession(reason: "stillTimer")
+                }
+                stillWorkItem = work
+                processingQueue.asyncAfter(deadline: .now() + stillDelay, execute: work)
+            }
+            return
+        } else {
+            stillWorkItem?.cancel()
+            stillWorkItem = nil
+        }
+
+        // À partir d'ici sessionActive == true : la session continue.
+        do {
+            // Vérifie le sens de rotation sur le bon axe
+            let signedRate: Double
+            switch detectedMode {
+            case .spin:
+                signedRate = data.rotationRate.z * spinDirection
+            case .backflip:
+                signedRate = data.rotationRate.x * spinDirection
+            case .sideflip:
+                signedRate = data.rotationRate.y * spinDirection
+            }
+
+            if signedRate < -0.5 {
+                endSession(reason: "reverse")
+                blockedAfterReverse = true
+                DispatchQueue.main.async { self.isBlockedAfterReverse = true }
+                reverseBlockWorkItem?.cancel()
+                let work = DispatchWorkItem { [weak self] in
+                    guard let self = self else { return }
+                    self.blockedAfterReverse = false
+                    self.reverseBlockWorkItem = nil
+                    DispatchQueue.main.async { self.isBlockedAfterReverse = false }
+                }
+                reverseBlockWorkItem = work
+                processingQueue.asyncAfter(deadline: .now() + stillDelay, execute: work)
+                return
+            }
+
+            guard signedRate > 0 else { return }
+
+            // Delta-t réel écoulé depuis le dernier échantillon intégré,
+            // basé sur l'horloge CoreMotion (data.timestamp) plutôt que sur
+            // gyroUpdateInterval : la cadence réelle de livraison peut
+            // s'écarter de la cadence demandée (0.02s) et cette erreur
+            // s'accumulerait sur toute la session si on l'ignorait.
+            // Au premier échantillon de la session (pas de référence encore),
+            // on retombe sur l'intervalle nominal pour ne pas perdre cet
+            // échantillon.
+            let dt = lastGyroTimestamp.map { data.timestamp - $0 } ?? motion.gyroUpdateInterval
+            lastGyroTimestamp = data.timestamp
+
+            totalRadians += signedRate * dt
+            maxRPM = max(maxRPM, rpm)
+
+            rotationRateZSamples.append(signedRate)
+
+            let xyActivity = abs(data.rotationRate.x) + abs(data.rotationRate.y)
+            rotationRateXYSamples.append(xyActivity)
+
+            if let accelData = motion.accelerometerData {
+                let accelActivity = abs(accelData.acceleration.x) +
+                                   abs(accelData.acceleration.y) +
+                                   abs(accelData.acceleration.z - 1.0)
+                accelerometerSamples.append(accelActivity)
+            }
+
+            liveFingerProbability = computeFingerProbability(
+                zSamples: rotationRateZSamples,
+                xySamples: rotationRateXYSamples,
+                accelSamples: accelerometerSamples
+            )
+
+            liveChaosScore = computeChaosScore(
+                zSamples: rotationRateZSamples,
+                xySamples: rotationRateXYSamples,
+                accelSamples: accelerometerSamples
+            )
+
+            publishLive(timestamp: data.timestamp, rpm: rpm)
+        }
+    }
+
+    // Envoie un instantané de l'état de la session vers les @Published (main
+    // thread). Throttlé à uiPublishInterval sauf si force (transitions de
+    // session), pour ne pas imposer un recalcul SwiftUI à chaque échantillon.
+    private func publishLive(timestamp: TimeInterval, rpm: Double, force: Bool = false) {
+        guard force || timestamp - lastPublishTimestamp >= uiPublishInterval else { return }
+        lastPublishTimestamp = timestamp
+
+        let spins = totalRadians / (2 * .pi)
+        let spinning = sessionActive
+        let mode = detectedMode
+        let finger = liveFingerProbability
+        let chaos = liveChaosScore
+        DispatchQueue.main.async {
+            self.currentSpins = spins
+            self.currentRPM = rpm
+            self.isSpinning = spinning
+            self.currentMode = mode
+            self.currentFingerProbability = finger
+            self.currentChaosScore = chaos
         }
     }
 
@@ -455,14 +526,17 @@ class MotionManager: ObservableObject {
         return min(max(combined, 0.0), 1.0)
     }
 
-    func endSession(reason: String = "unknown") {
-        guard let start = sessionStart, isSpinning else { return }
+    // Termine la session en cours. Doit être appelée sur processingQueue.
+    private func endSession(reason: String = "unknown") {
+        guard let start = sessionStart, sessionActive else { return }
+
+        let spins = totalRadians / (2 * .pi)
 
         // En dessous du seuil minimum, on considère que c'est un mouvement
         // accidentel (attraper/poser le téléphone) plutôt qu'un vrai spin :
         // pas de session sauvegardée, pas de mise à jour des records. L'état
         // est quand même réinitialisé plus bas dans tous les cas.
-        if currentSpins >= minValidSpins {
+        if spins >= minValidSpins {
             let probability = computeFingerProbability(
                 zSamples: rotationRateZSamples,
                 xySamples: rotationRateXYSamples,
@@ -475,53 +549,92 @@ class MotionManager: ObservableObject {
                 accelSamples: accelerometerSamples
             )
 
-            let session = SpinSessionModel(
-                totalSpins: currentSpins,
-                duration: Date().timeIntervalSince(start),
-                maxRPM: maxRPM,
-                fingerProbability: probability,
-                chaosScore: chaos,
-                spinMode: detectedMode.rawValue
-            )
+            let mode = detectedMode
+            let duration = Date().timeIntervalSince(start)
+            let peakRPM = maxRPM
 
             // Seules les rotations "réelles" (vrai spin, pas un mouvement
             // avec support) comptent pour les records.
-            if session.isRealSpin, session.totalSpins > (allTimeBests[detectedMode] ?? 0.0) {
-                allTimeBests[detectedMode] = session.totalSpins
-                UserDefaults.standard.set(session.totalSpins, forKey: "allTimeBest_\(detectedMode.rawValue)")
+            if probability >= SpinSessionModel.realSpinThreshold,
+               spins > (bests[mode] ?? 0.0) {
+                bests[mode] = spins
+                UserDefaults.standard.set(spins, forKey: "allTimeBest_\(mode.rawValue)")
             }
+            let bestsSnapshot = bests
 
-            lastCompletedSession = session
+            DispatchQueue.main.async {
+                self.allTimeBests = bestsSnapshot
+                // Le @Model SwiftData est construit sur le main thread, où
+                // ContentView l'insérera dans le modelContext : seules des
+                // valeurs simples voyagent entre les files.
+                self.lastCompletedSession = SpinSessionModel(
+                    totalSpins: spins,
+                    duration: duration,
+                    maxRPM: peakRPM,
+                    fingerProbability: probability,
+                    chaosScore: chaos,
+                    spinMode: mode.rawValue
+                )
+            }
         }
 
-        isSpinning = false
-        currentSpins = 0.0
-        currentRPM = 0.0
-        currentFingerProbability = 0.0
-        currentChaosScore = 0.0
-        currentMode = .spin
+        sessionActive = false
         totalRadians = 0.0
         maxRPM = 0.0
         sessionStart = nil
-        stillTimer?.invalidate()
-        stillTimer = nil
+        stillWorkItem?.cancel()
+        stillWorkItem = nil
         spinDirection = 0.0
         lastGyroTimestamp = nil
-        reverseBlockTimer?.invalidate()
-        reverseBlockTimer = nil
+        reverseBlockWorkItem?.cancel()
+        reverseBlockWorkItem = nil
         detectedMode = .spin
+        liveFingerProbability = 0.0
+        liveChaosScore = 0.0
         rotationRateZSamples = []
         rotationRateXYSamples = []
         accelerometerSamples = []
+
+        DispatchQueue.main.async {
+            self.isSpinning = false
+            self.currentSpins = 0.0
+            self.currentRPM = 0.0
+            self.currentFingerProbability = 0.0
+            self.currentChaosScore = 0.0
+            self.currentMode = .spin
+        }
+    }
+
+    // Remise à zéro des records absolus (bouton corbeille). La copie de
+    // référence (`bests`) appartient à la file de traitement, d'où le saut
+    // de file avant de mettre à jour UserDefaults et le miroir publié.
+    func resetBests() {
+        processingQueue.async {
+            for mode in SpinMode.allCases {
+                self.bests[mode] = 0.0
+                UserDefaults.standard.set(0.0, forKey: "allTimeBest_\(mode.rawValue)")
+            }
+            // Ancienne clé du record global (avant la séparation par mode).
+            UserDefaults.standard.removeObject(forKey: "allTimeBest")
+            let cleared = self.bests
+            DispatchQueue.main.async {
+                self.allTimeBests = cleared
+            }
+        }
     }
 
     func stopTracking() {
         motion.stopGyroUpdates()
         motion.stopAccelerometerUpdates()
-        stillTimer?.invalidate()
-        reverseBlockTimer?.invalidate()
-        reverseBlockTimer = nil
-        isBlockedAfterReverse = false
-        endSession(reason: "stopTracking")
+        // La fin de session manipule l'état interne : elle doit s'exécuter
+        // sur la file de traitement, après les derniers callbacks déjà
+        // en vol.
+        processingQueue.async {
+            self.reverseBlockWorkItem?.cancel()
+            self.reverseBlockWorkItem = nil
+            self.blockedAfterReverse = false
+            self.endSession(reason: "stopTracking")
+            DispatchQueue.main.async { self.isBlockedAfterReverse = false }
+        }
     }
 }
