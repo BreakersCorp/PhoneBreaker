@@ -31,6 +31,16 @@
         }
       }
     },
+    "%1$ds %2$03dms" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$ds %2$03dms"
+          }
+        }
+      }
+    },
     "%lld RPM" : {
       "localizations" : {
         "en" : {
@@ -112,10 +122,24 @@
       }
     },
     "Aucune session pour ce mode" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No sessions for this mode"
+          }
+        }
+      }
     },
     "Avec support" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Propped"
+          }
+        }
+      }
     },
     "Backflip" : {
       "localizations" : {
@@ -138,10 +162,24 @@
       }
     },
     "Date" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Date"
+          }
+        }
+      }
     },
     "Fermer" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        }
+      }
     },
     "Lance une session pour commencer !" : {
       "localizations" : {
@@ -154,7 +192,14 @@
       }
     },
     "Mode" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mode"
+          }
+        }
+      }
     },
     "Moyenne" : {
       "localizations" : {
@@ -167,10 +212,24 @@
       }
     },
     "Progression" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Progress"
+          }
+        }
+      }
     },
     "Record" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Best"
+          }
+        }
+      }
     },
     "Record absolu" : {
       "localizations" : {
@@ -213,7 +272,14 @@
       }
     },
     "Sessions réelles" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Real sessions"
+          }
+        }
+      }
     },
     "Sideflip" : {
       "localizations" : {
@@ -246,7 +312,14 @@
       }
     },
     "Tours" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turns"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"

@@ -417,7 +417,7 @@ struct ContentView: View {
     private func durationString(_ duration: TimeInterval) -> String {
         let seconds = Int(duration)
         let ms = Int((duration - Double(seconds)) * 1000)
-        return String(format: "%ds %03dms", seconds, ms)
+        return String(format: String(localized: "%1$ds %2$03dms"), locale: .current, seconds, ms)
     }
 
     private func fingerLabel(_ probability: Double) -> String {
