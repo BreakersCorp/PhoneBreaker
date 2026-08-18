@@ -43,6 +43,10 @@ class MotionManager: ObservableObject {
     // UserDefaults sous les clés "allTimeBest_<mode>". Miroir d'affichage
     // de `bests`, qui reste la référence côté traitement.
     @Published var allTimeBests: [SpinMode: Double] = MotionManager.loadAllTimeBests()
+    // Compteur de records battus depuis le lancement. Ne sert que de
+    // déclencheur Equatable pour le retour haptique (.sensoryFeedback)
+    // côté vue — la valeur elle-même n'est jamais affichée.
+    @Published var recordsBeaten: Int = 0
     @Published var lastCompletedSession: SpinSessionModel? = nil
     @Published var currentFingerProbability: Double = 0.0
     @Published var isBlockedAfterReverse: Bool = false
@@ -555,15 +559,20 @@ class MotionManager: ObservableObject {
 
             // Seules les rotations "réelles" (vrai spin, pas un mouvement
             // avec support) comptent pour les records.
+            var isNewRecord = false
             if probability >= SpinSessionModel.realSpinThreshold,
                spins > (bests[mode] ?? 0.0) {
                 bests[mode] = spins
                 UserDefaults.standard.set(spins, forKey: "allTimeBest_\(mode.rawValue)")
+                isNewRecord = true
             }
             let bestsSnapshot = bests
 
             DispatchQueue.main.async {
                 self.allTimeBests = bestsSnapshot
+                if isNewRecord {
+                    self.recordsBeaten += 1
+                }
                 // Le @Model SwiftData est construit sur le main thread, où
                 // ContentView l'insérera dans le modelContext : seules des
                 // valeurs simples voyagent entre les files.

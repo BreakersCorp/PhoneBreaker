@@ -221,6 +221,10 @@ struct ContentView: View {
             }
             .background(Color("PBBackground").ignoresSafeArea())
             .tint(Color("AccentColor"))
+            // Haptique de célébration quand un record absolu vient d'être
+            // battu (recordsBeaten est incrémenté par le MotionManager en
+            // fin de session).
+            .sensoryFeedback(.success, trigger: motion.recordsBeaten)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ShareLink(item: recordsShareText) {
