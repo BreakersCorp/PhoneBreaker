@@ -70,6 +70,50 @@ final class GameCenterManager: ObservableObject {
         }
     }
 
+    // Identifiants des succès. Doivent correspondre exactement aux IDs
+    // configurés dans App Store Connect (même convention pointée que les
+    // leaderboards).
+    private enum AchievementID {
+        static let firstRealSpin = "achievement.firstRealSpin"
+        static let tenSpinsSession = "achievement.tenSpinsSession"
+        static let rpm500 = "achievement.rpm500"
+        static let allModes = "achievement.allModes"
+        static let sessions100 = "achievement.sessions100"
+    }
+
+    // Rapporte la progression des succès après une session réelle. Game
+    // Center ignore un percentComplete inférieur à celui déjà enregistré :
+    // on peut donc soumettre la progression courante à chaque session sans
+    // relire l'état distant, et re-rapporter un succès déjà complété est
+    // sans effet (pas de seconde bannière).
+    func reportAchievements(session: SpinSessionModel, realSessionCount: Int, realModesPlayed: Int) {
+        guard isAuthenticated else { return }
+
+        func achievement(_ identifier: String, percent: Double) -> GKAchievement {
+            let achievement = GKAchievement(identifier: identifier)
+            achievement.percentComplete = min(max(percent, 0), 100)
+            achievement.showsCompletionBanner = true
+            return achievement
+        }
+
+        let achievements = [
+            achievement(AchievementID.firstRealSpin, percent: 100),
+            achievement(AchievementID.tenSpinsSession, percent: session.totalSpins / 10.0 * 100),
+            achievement(AchievementID.rpm500, percent: session.maxRPM / 500.0 * 100),
+            achievement(AchievementID.allModes, percent: Double(realModesPlayed) / Double(SpinMode.allCases.count) * 100),
+            // 100 sessions réelles visées : 1 session = 1 %.
+            achievement(AchievementID.sessions100, percent: Double(realSessionCount))
+        ]
+
+        Task {
+            do {
+                try await GKAchievement.report(achievements)
+            } catch {
+                print("Game Center achievements: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func refreshFriendRecords() async {
         guard isAuthenticated, !isLoadingFriends else { return }
         isLoadingFriends = true

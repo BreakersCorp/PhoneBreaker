@@ -293,6 +293,19 @@ struct ContentView: View {
                             spins: session.totalSpins,
                             mode: SpinMode(rawValue: session.spinMode) ?? .spin
                         )
+                        // La @Query peut ne pas encore refléter l'insertion
+                        // ci-dessus au moment où ce onChange s'exécute : on
+                        // compte la nouvelle session explicitement si elle
+                        // n'y figure pas déjà.
+                        var realSessions = sessions.filter(\.isRealSpin)
+                        if !realSessions.contains(where: { $0 === session }) {
+                            realSessions.append(session)
+                        }
+                        gameCenter.reportAchievements(
+                            session: session,
+                            realSessionCount: realSessions.count,
+                            realModesPlayed: Set(realSessions.map(\.spinMode)).count
+                        )
                     }
                 }
             }
