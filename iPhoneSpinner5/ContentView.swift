@@ -225,10 +225,16 @@ struct ContentView: View {
             }
             .background(Color("PBBackground").ignoresSafeArea())
             .tint(Color("AccentColor"))
-            // Haptique de célébration quand un record absolu vient d'être
-            // battu (recordsBeaten est incrémenté par le MotionManager en
-            // fin de session).
-            .sensoryFeedback(.success, trigger: motion.recordsBeaten)
+            // Retour haptique de fin de session : un impact simple pour une
+            // session ordinaire, trois pour un record battu. Les deux
+            // compteurs sont exclusifs (voir MotionManager.endSession), une
+            // même session ne déclenche donc jamais les deux motifs.
+            .onChange(of: motion.sessionsCompleted) { _, _ in
+                playImpacts(1)
+            }
+            .onChange(of: motion.recordsBeaten) { _, _ in
+                playImpacts(3)
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     ShareLink(item: recordsShareText) {
@@ -430,6 +436,20 @@ struct ContentView: View {
         // MotionManager : les écraser directement ici désynchroniserait sa
         // copie interne, côté file de traitement.
         motion.resetBests()
+    }
+
+    // Joue `count` impacts haptiques espacés de 150 ms. .sensoryFeedback ne
+    // sait jouer qu'un retour par changement de valeur, d'où le générateur
+    // UIKit pour les motifs répétés.
+    private func playImpacts(_ count: Int) {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
+        Task {
+            for index in 0..<count {
+                if index > 0 { try? await Task.sleep(for: .milliseconds(150)) }
+                generator.impactOccurred()
+            }
+        }
     }
 
     private func durationString(_ duration: TimeInterval) -> String {
