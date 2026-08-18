@@ -8,6 +8,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @State private var showResetConfirmation = false
+    @State private var showProgression = false
 
     var body: some View {
         NavigationStack {
@@ -233,6 +234,14 @@ struct ContentView: View {
                     .disabled(!hasAnyRecord)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showProgression = true
+                    } label: {
+                        Image(systemName: "chart.xyaxis.line")
+                    }
+                    .disabled(sessions.isEmpty)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {
                         showResetConfirmation = true
                     } label: {
@@ -240,6 +249,9 @@ struct ContentView: View {
                             .foregroundStyle(.red)
                     }
                 }
+            }
+            .sheet(isPresented: $showProgression) {
+                ProgressionChartView(sessions: sessions)
             }
             .confirmationDialog(
                 "Réinitialiser les scores ?",
