@@ -73,13 +73,22 @@ final class GameCenterManager: ObservableObject {
     // Identifiants des succès. Doivent correspondre exactement aux IDs
     // configurés dans App Store Connect (même convention pointée que les
     // leaderboards).
+    // Les IDs restent volontairement neutres (pas de seuil dans le nom) pour
+    // pouvoir ajuster les seuils ci-dessous sans casser la correspondance
+    // avec App Store Connect.
     private enum AchievementID {
         static let firstRealSpin = "achievement.firstRealSpin"
-        static let tenSpinsSession = "achievement.tenSpinsSession"
-        static let rpm500 = "achievement.rpm500"
+        static let bigSpinSession = "achievement.bigSpinSession"
+        static let highRPM = "achievement.highRPM"
         static let allModes = "achievement.allModes"
         static let sessions100 = "achievement.sessions100"
     }
+
+    // Seuils des succès progressifs, calés à la limite du faisable sans
+    // tricher (validés le 2026-08-18) : 3,50 tours en une session et
+    // 400 RPM en pointe.
+    private static let bigSessionSpins = 3.5
+    private static let highRPMTarget = 400.0
 
     // Rapporte la progression des succès après une session réelle. Game
     // Center ignore un percentComplete inférieur à celui déjà enregistré :
@@ -98,8 +107,8 @@ final class GameCenterManager: ObservableObject {
 
         let achievements = [
             achievement(AchievementID.firstRealSpin, percent: 100),
-            achievement(AchievementID.tenSpinsSession, percent: session.totalSpins / 10.0 * 100),
-            achievement(AchievementID.rpm500, percent: session.maxRPM / 500.0 * 100),
+            achievement(AchievementID.bigSpinSession, percent: session.totalSpins / Self.bigSessionSpins * 100),
+            achievement(AchievementID.highRPM, percent: session.maxRPM / Self.highRPMTarget * 100),
             achievement(AchievementID.allModes, percent: Double(realModesPlayed) / Double(SpinMode.allCases.count) * 100),
             // 100 sessions réelles visées : 1 session = 1 %.
             achievement(AchievementID.sessions100, percent: Double(realSessionCount))
