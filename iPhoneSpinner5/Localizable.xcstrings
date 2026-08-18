@@ -21,6 +21,16 @@
         }
       }
     },
+    "%1$@ : %2$@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
     "%lld RPM" : {
       "localizations" : {
         "en" : {
@@ -91,6 +101,16 @@
         }
       }
     },
+    "🏆 Mes records de spin :" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🏆 My spin records:"
+          }
+        }
+      }
+    },
     "🔄 Backflip" : {
       "localizations" : {
         "en" : {
@@ -107,6 +127,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancel"
+          }
+        }
+      }
+    },
+    "Aucun record d'ami pour l'instant" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No friend records yet"
           }
         }
       }
@@ -147,6 +177,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "All-time best"
+          }
+        }
+      }
+    },
+    "Records des amis" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Friends' records"
           }
         }
       }

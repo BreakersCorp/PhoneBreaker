@@ -3,6 +3,7 @@ import SwiftData
 
 struct ContentView: View {
     @StateObject private var motion = MotionManager()
+    @StateObject private var gameCenter = GameCenterManager()
     @Query(sort: \SpinSessionModel.date, order: .reverse) var sessions: [SpinSessionModel]
     @Environment(\.modelContext) private var modelContext
     @State private var showResetConfirmation = false
@@ -80,16 +81,7 @@ struct ContentView: View {
                     Label("Record absolu", systemImage: "star.fill")
                         .foregroundStyle(Color("PBAmber"))
                         .font(.subheadline)
-                    modeScoresRow { mode in
-                        // Max entre le record persisté (UserDefaults) et le
-                        // meilleur des sessions réelles stockées : les sessions
-                        // antérieures à la séparation des records par mode
-                        // n'ont jamais écrit leur record par mode.
-                        let stored = motion.allTimeBests[mode] ?? 0.0
-                        let fromSessions = bestRealSessionSpins(for: mode) ?? 0.0
-                        let best = max(stored, fromSessions)
-                        return best > 0 ? best : nil
-                    }
+                    modeScoresRow { bestScore(for: $0) }
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 8)
@@ -102,6 +94,52 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 16)
+
+                // --- Records des amis (Game Center) ---
+                if gameCenter.isAuthenticated {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Label("Records des amis", systemImage: "person.2.fill")
+                                .foregroundStyle(Color("PBAmber"))
+                                .font(.subheadline)
+                            Spacer()
+                            Button {
+                                Task { await gameCenter.refreshFriendRecords() }
+                            } label: {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                            .disabled(gameCenter.isLoadingFriends)
+                        }
+                        if gameCenter.friendRecords.isEmpty {
+                            Text("Aucun record d'ami pour l'instant")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            // Les 3 meilleurs amis suffisent ici : l'espace
+                            // vertical est compté, la liste des sessions
+                            // reste la zone principale.
+                            ForEach(gameCenter.friendRecords.prefix(3)) { friend in
+                                HStack {
+                                    Text(friend.displayName)
+                                        .font(.caption)
+                                        .lineLimit(1)
+                                    Spacer()
+                                    ForEach(SpinMode.allCases, id: \.self) { mode in
+                                        HStack(spacing: 3) {
+                                            Text(mode.emoji)
+                                                .font(.caption2)
+                                            Text(spinsString(friend.bests[mode]))
+                                                .font(.caption.monospacedDigit())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                }
 
                 // --- Liste ---
                 if sessions.isEmpty {
@@ -180,6 +218,12 @@ struct ContentView: View {
             .background(Color("PBBackground").ignoresSafeArea())
             .tint(Color("AccentColor"))
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    ShareLink(item: recordsShareText) {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .disabled(!hasAnyRecord)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(role: .destructive) {
                         showResetConfirmation = true
@@ -201,10 +245,30 @@ struct ContentView: View {
             }
             .onAppear {
                 motion.startTracking()
+                gameCenter.authenticate()
             }
             .onChange(of: motion.lastCompletedSession) { _, session in
                 if let session = session {
                     modelContext.insert(session)
+                    // Game Center ne garde que le meilleur score : on peut
+                    // soumettre chaque session réelle sans comparer au record.
+                    if session.isRealSpin {
+                        gameCenter.submit(
+                            spins: session.totalSpins,
+                            mode: SpinMode(rawValue: session.spinMode) ?? .spin
+                        )
+                    }
+                }
+            }
+            .onChange(of: gameCenter.isAuthenticated) { _, authenticated in
+                // À la connexion, pousse les records locaux existants pour que
+                // les leaderboards reflètent l'historique d'avant l'intégration
+                // Game Center.
+                guard authenticated else { return }
+                for mode in SpinMode.allCases {
+                    if let best = bestScore(for: mode) {
+                        gameCenter.submit(spins: best, mode: mode)
+                    }
                 }
             }
         }
@@ -227,6 +291,33 @@ struct ContentView: View {
                 }
             }
         }
+    }
+
+    // Record affiché pour un mode : max entre le record persisté (UserDefaults)
+    // et le meilleur des sessions réelles stockées, car les sessions
+    // antérieures à la séparation des records par mode n'ont jamais écrit
+    // leur record par mode. nil si aucun record n'existe.
+    private func bestScore(for mode: SpinMode) -> Double? {
+        let stored = motion.allTimeBests[mode] ?? 0.0
+        let fromSessions = bestRealSessionSpins(for: mode) ?? 0.0
+        let best = max(stored, fromSessions)
+        return best > 0 ? best : nil
+    }
+
+    private var hasAnyRecord: Bool {
+        SpinMode.allCases.contains { bestScore(for: $0) != nil }
+    }
+
+    // Texte des records partagé via la feuille de partage native,
+    // limité aux modes qui ont déjà un record.
+    private var recordsShareText: String {
+        var lines = [String(localized: "🏆 Mes records de spin :")]
+        for mode in SpinMode.allCases {
+            guard let best = bestScore(for: mode) else { continue }
+            let value = String(format: String(localized: "%.2f tours"), best)
+            lines.append(String(format: String(localized: "%1$@ : %2$@"), mode.label, value))
+        }
+        return lines.joined(separator: "\n")
     }
 
     // Meilleur score des sessions "réelles" (vrai spin) stockées pour un mode
