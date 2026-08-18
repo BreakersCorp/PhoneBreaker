@@ -134,6 +134,9 @@ struct ContentView: View {
                                             Text(spinsString(friend.bests[mode]))
                                                 .font(.caption.monospacedDigit())
                                         }
+                                        .accessibilityElement(children: .ignore)
+                                        .accessibilityLabel(mode.name)
+                                        .accessibilityValue(accessibilitySpinsValue(friend.bests[mode]))
                                     }
                                 }
                             }
@@ -335,11 +338,24 @@ struct ContentView: View {
                         .font(.subheadline.monospacedDigit())
                         .fontWeight(.semibold)
                 }
+                // VoiceOver lit mal les emojis seuls (🌀 → « cyclone ») :
+                // chaque segment devient un élément unique annonçant le
+                // nom du mode puis la valeur.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(mode.name)
+                .accessibilityValue(accessibilitySpinsValue(value(mode)))
                 if mode != SpinMode.allCases.last {
                     Spacer()
                 }
             }
         }
+    }
+
+    // Valeur lue par VoiceOver pour un score : le tiret visuel devient
+    // une vraie phrase.
+    private func accessibilitySpinsValue(_ spins: Double?) -> String {
+        guard let spins else { return String(localized: "Aucun record") }
+        return String(format: String(localized: "%.2f tours"), locale: .current, spins)
     }
 
     // Record affiché pour un mode : max entre le record persisté (UserDefaults)

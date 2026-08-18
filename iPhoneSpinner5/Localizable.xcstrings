@@ -121,6 +121,16 @@
         }
       }
     },
+    "Aucun record" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No record"
+          }
+        }
+      }
+    },
     "Aucune session pour ce mode" : {
       "localizations" : {
         "en" : {

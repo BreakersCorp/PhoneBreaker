@@ -37,7 +37,11 @@ struct ProgressionChartView: View {
             VStack(spacing: 16) {
                 Picker("Mode", selection: $selectedMode) {
                     ForEach(SpinMode.allCases, id: \.self) { mode in
-                        Text(mode.emoji).tag(mode)
+                        // Emoji seul illisible pour VoiceOver : on annonce
+                        // le nom du mode.
+                        Text(mode.emoji)
+                            .accessibilityLabel(mode.name)
+                            .tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
