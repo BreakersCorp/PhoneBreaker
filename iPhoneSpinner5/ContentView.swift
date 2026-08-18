@@ -265,6 +265,8 @@ struct ContentView: View {
                     resetScores()
                 }
                 Button("Annuler", role: .cancel) {}
+            } message: {
+                Text("Les sessions et records locaux seront effacés. Les records déjà envoyés à Game Center resteront sur les leaderboards.")
             }
             .onAppear {
                 motion.startTracking()

@@ -201,6 +201,16 @@
         }
       }
     },
+    "Les sessions et records locaux seront effacés. Les records déjà envoyés à Game Center resteront sur les leaderboards." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local sessions and records will be erased. Records already sent to Game Center will remain on the leaderboards."
+          }
+        }
+      }
+    },
     "Mode" : {
       "localizations" : {
         "en" : {
