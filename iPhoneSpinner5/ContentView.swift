@@ -125,7 +125,7 @@ struct ContentView: View {
                                 Text("\(session.totalSpins, specifier: "%.2f") tours")
                                     .font(.headline.monospacedDigit())
                                 Spacer()
-                                Text(SpinMode(rawValue: session.spinMode)?.label ?? "🌀 Spin")
+                                Text((SpinMode(rawValue: session.spinMode) ?? .spin).label)
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                                 Text("\(Int(session.maxRPM)) RPM max")
@@ -271,22 +271,22 @@ struct ContentView: View {
 
     private func durationString(_ duration: TimeInterval) -> String {
         let seconds = Int(duration)
-        let ms = Int((duration - Double(seconds)) * 100)
-        return String(format: "%ds %02dms", seconds, ms)
+        let ms = Int((duration - Double(seconds)) * 1000)
+        return String(format: "%ds %03dms", seconds, ms)
     }
 
     private func fingerLabel(_ probability: Double) -> String {
         switch probability {
-        case 0.7...: return String(localized: "✅ Vrai spin")
-        case 0.4..<0.7: return String(localized: "⚠️ Incertain")
+        case SpinSessionModel.realSpinThreshold...: return String(localized: "✅ Vrai spin")
+        case 0.4..<SpinSessionModel.realSpinThreshold: return String(localized: "⚠️ Incertain")
         default: return String(localized: "❌ Support")
         }
     }
 
     private func fingerColor(_ probability: Double) -> Color {
         switch probability {
-        case 0.7...: return .green
-        case 0.4..<0.7: return .orange
+        case SpinSessionModel.realSpinThreshold...: return .green
+        case 0.4..<SpinSessionModel.realSpinThreshold: return .orange
         default: return .red
         }
     }

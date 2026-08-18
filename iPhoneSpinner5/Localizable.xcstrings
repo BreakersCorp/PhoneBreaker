@@ -22,7 +22,7 @@
       }
     },
     "%@" : {
-
+      "shouldTranslate" : false
     },
     "%lld RPM" : {
       "localizations" : {

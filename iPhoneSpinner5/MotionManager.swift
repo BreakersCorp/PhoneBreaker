@@ -120,12 +120,6 @@ class MotionManager: ObservableObject {
         motion.startGyroUpdates(to: .main) { [weak self] data, error in
             guard let self = self, let data = data else { return }
 
-            // DEBUG print:
-//            print(String(format: "[RAW] x=%.2f y=%.2f z=%.2f",
-//                abs(data.rotationRate.x),
-//                abs(data.rotationRate.y),
-//                abs(data.rotationRate.z)))
-
             if self.isBlockedAfterReverse { return }
 
             // Sélectionne le bon axe selon le mode détecté
@@ -505,6 +499,7 @@ class MotionManager: ObservableObject {
         totalRadians = 0.0
         maxRPM = 0.0
         sessionStart = nil
+        stillTimer?.invalidate()
         stillTimer = nil
         spinDirection = 0.0
         lastGyroTimestamp = nil
