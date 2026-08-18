@@ -21,16 +21,6 @@
         }
       }
     },
-    "%1$@ : %2$@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@: %2$@"
-          }
-        }
-      }
-    },
     "%lld RPM" : {
       "localizations" : {
         "en" : {
@@ -51,12 +41,12 @@
         }
       }
     },
-    "↔️ Sideflip" : {
+    "*** • %1$@ – %2$@ %3$@ ***" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "↔️ Sideflip"
+            "value" : "*** • %1$@ – %2$@ %3$@ ***"
           }
         }
       }
@@ -91,36 +81,6 @@
         }
       }
     },
-    "🌀 Spin" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "🌀 Spin"
-          }
-        }
-      }
-    },
-    "🏆 Mes records de spin :" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "🏆 My spin records:"
-          }
-        }
-      }
-    },
-    "🔄 Backflip" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "🔄 Backflip"
-          }
-        }
-      }
-    },
     "Annuler" : {
       "localizations" : {
         "en" : {
@@ -141,6 +101,16 @@
         }
       }
     },
+    "Backflip" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Backflip"
+          }
+        }
+      }
+    },
     "Chaos" : {
       "localizations" : {
         "en" : {
@@ -157,6 +127,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start a session to begin!"
+          }
+        }
+      }
+    },
+    "Mes records PhoneBreaker :" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "My PhoneBreaker records:"
           }
         }
       }
@@ -207,6 +187,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reset scores?"
+          }
+        }
+      }
+    },
+    "Sideflip" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sideflip"
+          }
+        }
+      }
+    },
+    "Spin" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spin"
           }
         }
       }

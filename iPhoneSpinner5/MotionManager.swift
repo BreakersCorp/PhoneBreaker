@@ -7,13 +7,17 @@ enum SpinMode: String, CaseIterable {
     case backflip = "backflip"
     case sideflip = "sideflip"
 
-    var label: String {
+    // Nom du mode sans emoji, pour les contextes où l'emoji ferait
+    // tache (texte de partage notamment).
+    var name: String {
         switch self {
-        case .spin: return String(localized: "🌀 Spin")
-        case .backflip: return String(localized: "🔄 Backflip")
-        case .sideflip: return String(localized: "↔️ Sideflip")
+        case .spin: return String(localized: "Spin")
+        case .backflip: return String(localized: "Backflip")
+        case .sideflip: return String(localized: "Sideflip")
         }
     }
+
+    var label: String { "\(emoji) \(name)" }
 
     var emoji: String {
         switch self {
