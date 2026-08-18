@@ -21,6 +21,16 @@
         }
       }
     },
+    "%1$@ : %2$@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
+          }
+        }
+      }
+    },
     "%lld RPM" : {
       "localizations" : {
         "en" : {
@@ -37,16 +47,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld RPM max"
-          }
-        }
-      }
-    },
-    "%1$@ : %2$@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@: %2$@"
           }
         }
       }
@@ -81,6 +81,16 @@
         }
       }
     },
+    "🏆 Mes records de spin :" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "🏆 My spin records:"
+          }
+        }
+      }
+    },
     "Annuler" : {
       "localizations" : {
         "en" : {
@@ -100,6 +110,12 @@
           }
         }
       }
+    },
+    "Aucune session pour ce mode" : {
+
+    },
+    "Avec support" : {
+
     },
     "Backflip" : {
       "localizations" : {
@@ -121,6 +137,12 @@
         }
       }
     },
+    "Date" : {
+
+    },
+    "Fermer" : {
+
+    },
     "Lance une session pour commencer !" : {
       "localizations" : {
         "en" : {
@@ -131,15 +153,8 @@
         }
       }
     },
-    "🏆 Mes records de spin :" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "🏆 My spin records:"
-          }
-        }
-      }
+    "Mode" : {
+
     },
     "Moyenne" : {
       "localizations" : {
@@ -150,6 +165,12 @@
           }
         }
       }
+    },
+    "Progression" : {
+
+    },
+    "Record" : {
+
     },
     "Record absolu" : {
       "localizations" : {
@@ -191,6 +212,9 @@
         }
       }
     },
+    "Sessions réelles" : {
+
+    },
     "Sideflip" : {
       "localizations" : {
         "en" : {
@@ -220,6 +244,9 @@
           }
         }
       }
+    },
+    "Tours" : {
+
     }
   },
   "version" : "1.0"
