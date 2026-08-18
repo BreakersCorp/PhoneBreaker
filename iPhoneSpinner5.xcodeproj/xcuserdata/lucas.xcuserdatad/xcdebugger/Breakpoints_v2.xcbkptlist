@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Bucket
+   uuid = "460FAFF7-2EF1-42CA-8D30-E07805D3FCC5"
+   type = "1"
+   version = "2.0">
+   <Breakpoints>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "A63F9B5A-F580-400C-8913-CAB9DA24157D"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "iPhoneSpinner5/GameCenterManager.swift"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "123"
+            endingLineNumber = "123"
+            landmarkName = "presentAuthenticationSheet(_:)"
+            landmarkType = "7">
+            <Locations>
+               <Location
+                  uuid = "A63F9B5A-F580-400C-8913-CAB9DA24157D - 6a6f8d5cb2c5b049"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "static iPhoneSpinner5.GameCenterManager.presentAuthenticationSheet(__C.UIViewController) -&gt; ()"
+                  moduleName = "iPhoneSpinner5.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/lucas/Documents/XCode/iPhoneSpinner5/iPhoneSpinner5/GameCenterManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "123"
+                  endingLineNumber = "123">
+               </Location>
+               <Location
+                  uuid = "A63F9B5A-F580-400C-8913-CAB9DA24157D - 9b6586ebd155395"
+                  shouldBeEnabled = "Yes"
+                  ignoreCount = "0"
+                  continueAfterRunningActions = "No"
+                  symbolName = "closure #1 (__C.UIScene) -&gt; Swift.Optional&lt;__C.UIWindowScene&gt; in static iPhoneSpinner5.GameCenterManager.presentAuthenticationSheet(__C.UIViewController) -&gt; ()"
+                  moduleName = "iPhoneSpinner5.debug.dylib"
+                  usesParentBreakpointCondition = "Yes"
+                  urlString = "file:///Users/lucas/Documents/XCode/iPhoneSpinner5/iPhoneSpinner5/GameCenterManager.swift"
+                  startingColumnNumber = "9223372036854775807"
+                  endingColumnNumber = "9223372036854775807"
+                  startingLineNumber = "123"
+                  endingLineNumber = "123">
+               </Location>
+            </Locations>
+         </BreakpointContent>
+      </BreakpointProxy>
+   </Breakpoints>
+</Bucket>

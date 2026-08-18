@@ -309,29 +309,15 @@ struct ContentView: View {
     }
 
     // Texte des records partagé via la feuille de partage native,
-    // limité aux modes qui ont déjà un record. Format volontairement
-    // sobre (pas d'emoji) ; le locale: rend les nombres dans le format
-    // de la langue (virgule en français). Les noms sont complétés à
-    // droite et les valeurs à gauche pour que tirets et "tours" soient
-    // alignés d'une ligne à l'autre (alignement exact en chasse fixe,
-    // approximatif dans la police proportionnelle des messageries).
+    // limité aux modes qui ont déjà un record. Format avec emojis
+    // (préféré par les testeurs) ; le locale: rend les nombres dans le
+    // format de la langue (virgule en français).
     private var recordsShareText: String {
-        let records = SpinMode.allCases.compactMap { mode in
-            bestScore(for: mode).map {
-                (name: mode.name, value: String(format: "%.2f", locale: .current, $0))
-            }
-        }
-        let nameWidth = records.map(\.name.count).max() ?? 0
-        let valueWidth = records.map(\.value.count).max() ?? 0
-
-        var lines = [String(localized: "Mes records PhoneBreaker :")]
-        for record in records {
-            let name = record.name.padding(toLength: nameWidth, withPad: " ", startingAt: 0)
-            let value = String(repeating: " ", count: valueWidth - record.value.count) + record.value
-            lines.append(String(
-                format: String(localized: "*** • %1$@ – %2$@ %3$@ ***"),
-                name, value, String(localized: "tours")
-            ))
+        var lines = [String(localized: "🏆 Mes records de spin :")]
+        for mode in SpinMode.allCases {
+            guard let best = bestScore(for: mode) else { continue }
+            let value = String(format: String(localized: "%.2f tours"), locale: .current, best)
+            lines.append(String(format: String(localized: "%1$@ : %2$@"), mode.label, value))
         }
         return lines.joined(separator: "\n")
     }
