@@ -442,7 +442,7 @@ struct ContentView: View {
     // sait jouer qu'un retour par changement de valeur, d'où le générateur
     // UIKit pour les motifs répétés.
     private func playImpacts(_ count: Int) {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
+        let generator = UIImpactFeedbackGenerator(style: .heavy)
         generator.prepare()
         Task {
             for index in 0..<count {
