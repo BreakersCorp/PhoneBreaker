@@ -21,9 +21,6 @@
         }
       }
     },
-    "%@" : {
-      "shouldTranslate" : false
-    },
     "%lld RPM" : {
       "localizations" : {
         "en" : {

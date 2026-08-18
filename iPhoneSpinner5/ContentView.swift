@@ -7,12 +7,6 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var showResetConfirmation = false
 
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "dd/MM HH:mm"
-        return formatter
-    }()
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -165,7 +159,9 @@ struct ContentView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Spacer()
-                                Text("\(session.date, formatter: dateFormatter)")
+                                // Format sensible à la locale : ordre jour/mois
+                                // et horloge 12/24h adaptés à la langue.
+                                Text(session.date, format: .dateTime.day(.twoDigits).month(.twoDigits).hour().minute())
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
