@@ -152,64 +152,67 @@ struct ContentView: View {
                 } else {
                     let maxSpins = sessions.map(\.totalSpins).max() ?? 1.0
 
-                    List(sessions) { session in
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                Text("\(session.totalSpins, specifier: "%.2f") tours")
-                                    .font(.headline.monospacedDigit())
-                                Spacer()
-                                Text((SpinMode(rawValue: session.spinMode) ?? .spin).label)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Text("\(Int(session.maxRPM)) RPM max")
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(Color("PBAmber"))
-                            }
-
-                            GeometryReader { geo in
-                                RoundedRectangle(cornerRadius: 4)
-                                    .fill(Color("PBAmber").opacity(0.7))
-                                    .frame(width: geo.size.width * (session.totalSpins / maxSpins), height: 6)
-                            }
-                            .frame(height: 6)
-
-                            HStack(spacing: 4) {
-                                Text("Chaos")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Text(String(format: "%.2f", session.chaosScore))
-                                    .font(.caption2)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(chaosColor(session.chaosScore))
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(.gray.opacity(0.2))
-                                        RoundedRectangle(cornerRadius: 2)
-                                            .fill(chaosColor(session.chaosScore))
-                                            .frame(width: geo.size.width * min(session.chaosScore, 2.0) / 2.0)
-                                    }
+                    List {
+                        ForEach(sessions) { session in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack {
+                                    Text("\(session.totalSpins, specifier: "%.2f") tours")
+                                        .font(.headline.monospacedDigit())
+                                    Spacer()
+                                    Text((SpinMode(rawValue: session.spinMode) ?? .spin).label)
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text("\(Int(session.maxRPM)) RPM max")
+                                        .font(.caption.monospacedDigit())
+                                        .foregroundStyle(Color("PBAmber"))
                                 }
-                                .frame(height: 4)
-                            }
 
-                            HStack {
-                                Text(durationString(session.duration))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                // Format sensible à la locale : ordre jour/mois
-                                // et horloge 12/24h adaptés à la langue.
-                                Text(session.date, format: .dateTime.day(.twoDigits).month(.twoDigits).hour().minute())
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                GeometryReader { geo in
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(Color("PBAmber").opacity(0.7))
+                                        .frame(width: geo.size.width * (session.totalSpins / maxSpins), height: 6)
+                                }
+                                .frame(height: 6)
+
+                                HStack(spacing: 4) {
+                                    Text("Chaos")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(String(format: "%.2f", session.chaosScore))
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(chaosColor(session.chaosScore))
+                                    GeometryReader { geo in
+                                        ZStack(alignment: .leading) {
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(.gray.opacity(0.2))
+                                            RoundedRectangle(cornerRadius: 2)
+                                                .fill(chaosColor(session.chaosScore))
+                                                .frame(width: geo.size.width * min(session.chaosScore, 2.0) / 2.0)
+                                        }
+                                    }
+                                    .frame(height: 4)
+                                }
+
+                                HStack {
+                                    Text(durationString(session.duration))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    // Format sensible à la locale : ordre jour/mois
+                                    // et horloge 12/24h adaptés à la langue.
+                                    Text(session.date, format: .dateTime.day(.twoDigits).month(.twoDigits).hour().minute())
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            .padding(.vertical, 4)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                            .listRowBackground(
+                                Color("PBSurface").overlay(fingerColor(session.fingerProbability).opacity(0.25))
+                            )
                         }
-                        .padding(.vertical, 4)
-                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-                        .listRowBackground(
-                            Color("PBSurface").overlay(fingerColor(session.fingerProbability).opacity(0.25))
-                        )
+                        .onDelete(perform: deleteSessions)
                     }
                     .environment(\.defaultMinListRowHeight, 0)
                     .listStyle(.plain)
@@ -361,6 +364,15 @@ struct ContentView: View {
     private func spinsString(_ spins: Double?) -> String {
         guard let spins else { return "–" }
         return String(format: "%.2f", spins)
+    }
+
+    // Suppression par swipe d'une session : ne touche pas aux records
+    // persistés (allTimeBests), qui survivent volontairement à la
+    // suppression de la session qui les a établis.
+    private func deleteSessions(at offsets: IndexSet) {
+        for index in offsets {
+            modelContext.delete(sessions[index])
+        }
     }
 
     private func resetScores() {
