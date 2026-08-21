@@ -121,6 +121,66 @@
         }
       }
     },
+    "Avant de spinner" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before you spin"
+          }
+        }
+      }
+    },
+    "Dégage l'espace autour de toi avant chaque session." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clear the space around you before every session."
+          }
+        }
+      }
+    },
+    "J'ai compris" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "I understand"
+          }
+        }
+      }
+    },
+    "Ne lance jamais ton téléphone près d'autres personnes." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Never throw your phone near other people."
+          }
+        }
+      }
+    },
+    "Privilégie une surface molle : canapé, lit, tapis." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spin over a soft surface: couch, bed, rug."
+          }
+        }
+      }
+    },
+    "Tu utilises PhoneBreaker à tes propres risques. L'éditeur décline toute responsabilité en cas de dommage matériel ou corporel." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You use PhoneBreaker at your own risk. The developer accepts no liability for damage to property or persons."
+          }
+        }
+      }
+    },
     "Aucun record" : {
       "localizations" : {
         "en" : {

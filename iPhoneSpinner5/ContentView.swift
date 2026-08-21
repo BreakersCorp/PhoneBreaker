@@ -9,6 +9,10 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showResetConfirmation = false
     @State private var showProgression = false
+    // Accord de l'utilisateur sur l'avertissement de sécurité du premier
+    // lancement (SafetyWarningView) : tant qu'il est false, un
+    // fullScreenCover bloque l'app.
+    @AppStorage("hasAcceptedSafetyWarning") private var hasAcceptedSafetyWarning = false
 
     var body: some View {
         NavigationStack {
@@ -261,6 +265,14 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showProgression) {
                 ProgressionChartView(sessions: sessions)
+            }
+            // fullScreenCover plutôt que sheet : pas de geste de fermeture,
+            // l'utilisateur doit passer par le bouton d'acceptation.
+            .fullScreenCover(isPresented: Binding(
+                get: { !hasAcceptedSafetyWarning },
+                set: { if !$0 { hasAcceptedSafetyWarning = true } }
+            )) {
+                SafetyWarningView { hasAcceptedSafetyWarning = true }
             }
             .confirmationDialog(
                 "Réinitialiser les scores ?",
